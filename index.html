@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DuoSport - Dark Mode</title>
+    <title>DuoSport</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#121212">
+    
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background-color: #121212; /* Dark Mode absolu */
+            background-color: #121212;
             color: #e0e0e0;
             text-align: center;
             display: flex;
@@ -44,7 +47,7 @@
             margin: 20px 0 30px 0;
             font-size: 26px;
             font-weight: bold;
-            color: #4ade80; /* Vert néon */
+            color: #4ade80;
             box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
         }
         button {
@@ -65,9 +68,7 @@
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(74, 222, 128, 0.3);
         }
-        button:active { 
-            transform: translateY(1px); 
-        }
+        button:active { transform: translateY(1px); }
         button:disabled {
             background-color: #333;
             color: #777;
@@ -76,11 +77,36 @@
             transform: none;
         }
         
-        /* Nouveau design pour la flamme en bas à droite */
-        .streak {
+        /* Conteneurs pour les boutons en bas */
+        .bottom-left {
+            position: fixed;
+            bottom: 25px;
+            left: 25px;
+        }
+        .bottom-right {
             position: fixed;
             bottom: 25px;
             right: 25px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Style des petits boutons (Test et Reset) */
+        .btn-small {
+            background: rgba(30, 30, 30, 0.8);
+            color: #888;
+            border: 1px solid #333;
+            padding: 10px 15px;
+            border-radius: 30px;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .btn-small:hover { color: #fff; border-color: #555; }
+
+        .streak {
             font-size: 24px;
             font-weight: bold;
             color: #ffffff;
@@ -94,26 +120,36 @@
             gap: 8px;
             border: 1px solid #333;
         }
+        
+        .btn-icon {
+            padding: 10px;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 18px;
+        }
     </style>
 </head>
 <body>
 
     <div class="container">
         <h1>Entraînement du Jour</h1>
-        
-        <div class="exercise-box" id="exerciseDisplay">
-            ...
-        </div>
-
+        <div class="exercise-box" id="exerciseDisplay">...</div>
         <button id="doneBtn">J'ai fait mon sport !</button>
     </div>
 
-    <div class="streak">
-        🔥 <span id="streakCount">0</span>
+    <div class="bottom-left">
+        <button id="testNotifBtn" class="btn-small">🔔 Test Notif</button>
+    </div>
+
+    <div class="bottom-right">
+        <button id="resetStreakBtn" class="btn-small btn-icon" title="Remettre à zéro">🔄</button>
+        <div class="streak">🔥 <span id="streakCount">0</span></div>
     </div>
 
     <script>
-        // 1. La nouvelle liste stricte d'exercices
         const exercices = [
             "Planche (1 minute)",
             "50 Squats",
@@ -122,7 +158,6 @@
             "4 séries de 20 Abdos"
         ];
 
-        // 2. Les phrases avec Cindy
         const phrasesCindy = [
             "Fais ton sport ! Cindy ne serait pas très fière si tu abandonnais maintenant...",
             "Tu veux que Cindy te voie comme un lâche ? Allez, fais tes exercices !",
@@ -134,7 +169,6 @@
         const exerciseDisplay = document.getElementById('exerciseDisplay');
         const doneBtn = document.getElementById('doneBtn');
         const streakCount = document.getElementById('streakCount');
-
         const today = new Date().toISOString().split('T')[0];
 
         function initApp() {
@@ -142,7 +176,6 @@
                 Notification.requestPermission();
             }
 
-            // Choisir un exercice au hasard, mais le garder en mémoire pour toute la journée
             let savedDate = localStorage.getItem('exercise_date');
             let indexExercice = localStorage.getItem('exercise_index');
 
@@ -161,21 +194,13 @@
                 verrouillerBouton();
             }
 
-            // Lancer la planification des notifications
             planifierNotifications();
         }
 
         function verrouillerBouton() {
             doneBtn.innerText = "Fait ✅";
             doneBtn.disabled = true;
-            // Mode test : on déverrouille le bouton après 5 secondes pour pouvoir re-tester
-            setTimeout(resetPourLeTest, 5000);
-        }
-
-        function resetPourLeTest() {
-            doneBtn.disabled = false;
-            doneBtn.innerText = "J'ai fait mon sport !";
-            localStorage.removeItem('last_workout_date'); 
+            // Le setTimeout de test a été supprimé ici !
         }
 
         doneBtn.addEventListener('click', () => {
@@ -183,7 +208,7 @@
                 particleCount: 150,
                 spread: 80,
                 origin: { y: 0.6 },
-                colors: ['#4ade80', '#ffffff', '#22c55e'] // Confettis aux couleurs du dark mode
+                colors: ['#4ade80', '#ffffff', '#22c55e']
             });
 
             localStorage.setItem('last_workout_date', today);
@@ -201,11 +226,41 @@
             });
         });
 
-        // 3. Algorithme de planification des horaires
+        // Fonction pour envoyer la notification (utilisée par le programmateur aléatoire)
+        function envoyerRappel() {
+            if (localStorage.getItem('last_workout_date') === today) return;
+
+            if (Notification.permission === "granted") {
+                const phraseAleatoire = phrasesCindy[Math.floor(Math.random() * phrasesCindy.length)];
+                new Notification("Rappel Sport 🚨", { body: phraseAleatoire });
+            }
+        }
+
+        // --- NOUVEAU : Bouton Test Notification ---
+        document.getElementById('testNotifBtn').addEventListener('click', () => {
+            if (Notification.permission === "granted") {
+                const phraseAleatoire = phrasesCindy[Math.floor(Math.random() * phrasesCindy.length)];
+                new Notification("Test Rappel 🚨", { body: phraseAleatoire });
+            } else {
+                alert("Tu dois d'abord autoriser les notifications !");
+                Notification.requestPermission();
+            }
+        });
+
+        // --- NOUVEAU : Bouton Reset Compteur ---
+        document.getElementById('resetStreakBtn').addEventListener('click', () => {
+            if (confirm("Es-tu sûr de vouloir remettre ta série de jours à zéro ? 😢")) {
+                localStorage.setItem('sport_streak', 0);
+                streakCount.innerText = "0";
+                // Optionnel : on oublie aussi l'entraînement d'aujourd'hui pour pouvoir le refaire
+                localStorage.removeItem('last_workout_date');
+                doneBtn.disabled = false;
+                doneBtn.innerText = "J'ai fait mon sport !";
+            }
+        });
+
         function planifierNotifications() {
             const maintenant = new Date();
-            
-            // Les 3 créneaux demandés
             const creneaux = [
                 { start: 8, end: 9 },
                 { start: 12, end: 14 },
@@ -219,40 +274,19 @@
                 let fin = new Date();
                 fin.setHours(creneau.end, 0, 0, 0);
 
-                // Si l'heure est déjà passée aujourd'hui, on le programme pour demain
                 if (maintenant > fin) {
                     debut.setDate(debut.getDate() + 1);
                     fin.setDate(fin.getDate() + 1);
                 }
 
-                // Choisir une heure aléatoire exacte entre "debut" et "fin"
                 let heureAleatoire = new Date(debut.getTime() + Math.random() * (fin.getTime() - debut.getTime()));
-                
-                // Calculer le délai en millisecondes entre maintenant et l'heure aléatoire
                 let delai = heureAleatoire.getTime() - maintenant.getTime();
 
-                // Programmer la notification pour ce créneau
                 if (delai > 0) {
                     setTimeout(envoyerRappel, delai);
-                    console.log(`Notification programmée pour : ${heureAleatoire.toLocaleTimeString()}`);
                 }
             });
         }
-
-        function envoyerRappel() {
-            // Ne pas envoyer de rappel si le sport est déjà fait
-            if (localStorage.getItem('last_workout_date') === today) return;
-
-            if (Notification.permission === "granted") {
-                const phraseAleatoire = phrasesCindy[Math.floor(Math.random() * phrasesCindy.length)];
-                new Notification("Rappel Sport 🚨", {
-                    body: phraseAleatoire
-                });
-            }
-        }
-
-        // --- MODE TEST : Notification immédiate pour tester à l'ouverture ---
-        setTimeout(envoyerRappel, 5000); 
 
         initApp();
     </script>
