@@ -1,6 +1,6 @@
 {
-  "name": "DuoSport",
-  "short_name": "DuoSport",
+  "name": "FitDaily",
+  "short_name": "FitDaily",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#121212",
