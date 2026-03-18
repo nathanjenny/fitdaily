@@ -61,7 +61,7 @@
         .btn-small {
             background: #2a2a2a; color: #fff; border: 1px solid #444; padding: 8px 12px;
             border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer;
-            flex: 1; display: flex; justify-content: center; align-items: center; gap: 5px;
+            flex: 1; display: flex; justify-content: center; align-items: center;
         }
         .btn-small:hover:not(:disabled) { background: #333; }
         .btn-small:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -76,14 +76,15 @@
             background: #2a2a2a; border: 1px solid #333; padding: 12px 15px;
             border-radius: 12px; margin-bottom: 8px; font-size: 16px; font-weight: bold;
             color: #fff; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
-            text-align: center; line-height: 1.3;
+            /* Alignement à gauche forcé */
+            text-align: left; display: flex; justify-content: space-between; align-items: center; line-height: 1.3;
         }
         
         /* Bouton rapide Chrono dans la liste */
         .timer-quick-btn {
             background: #4ade80; color: #121212; border: none; padding: 6px 10px;
             border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 12px;
-            display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+            display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: 10px;
             box-shadow: 0 2px 5px rgba(74, 222, 128, 0.2);
         }
         .timer-quick-btn:hover { background: #22c55e; }
@@ -100,9 +101,10 @@
         .timer-btn {
             background: #333; color: #fff; border: none; width: 36px; height: 36px;
             border-radius: 50%; display: flex; justify-content: center; align-items: center;
-            cursor: pointer; font-size: 16px;
+            cursor: pointer; font-size: 16px; transition: all 0.2s;
         }
         .timer-btn.play { background: #4ade80; color: #121212; }
+        .timer-btn.pause { background: #f39c12; color: #121212; }
         .timer-btn:hover { filter: brightness(1.2); }
         .timer-btn:active { transform: scale(0.9); }
 
@@ -180,7 +182,7 @@
                 <option value="intermediaire">Niveau : Moyen</option>
                 <option value="difficile">Niveau : Difficile</option>
             </select>
-            <button id="rerollBtn" class="btn-small">🎲 Reroll (<span id="rerollCountUi">0</span>)</button>
+            <button id="rerollBtn" class="btn-small"><span>🎲 Reroll (<span id="rerollCountUi">0</span>)</span></button>
         </div>
 
         <h1>Entraînement du Jour</h1>
@@ -190,8 +192,7 @@
         <div id="timerContainer">
             <span id="timerDisplay">01:00</span>
             <div class="timer-controls">
-                <button class="timer-btn play" id="playTimerBtn">▶</button>
-                <button class="timer-btn" id="pauseTimerBtn">⏸</button>
+                <button class="timer-btn play" id="toggleTimerBtn">▶</button>
                 <button class="timer-btn" id="resetTimerBtn">🔄</button>
             </div>
         </div>
@@ -267,10 +268,13 @@
         
         let timerInterval = null;
         let timeLeft = 60;
-        let currentTimerDefault = 60; // Durée par défaut selon les exercices
+        let currentTimerDefault = 60;
         let isTimerRunning = false;
+        
+        const toggleTimerBtn = document.getElementById('toggleTimerBtn');
+        const timerDisplay = document.getElementById('timerDisplay');
 
-        // Fonction pour formater le temps (ex: 60 -> 01:00)
+        // Fonction pour formater le temps
         function formatTime(seconds) {
             let m = Math.floor(seconds / 60).toString().padStart(2, '0');
             let s = (seconds % 60).toString().padStart(2, '0');
@@ -313,6 +317,17 @@
                 let randomIndex = Math.floor(Math.random() * pool.length);
                 selection.push(pool.splice(randomIndex, 1)[0]);
             }
+
+            // NOUVEAU : Tri pour placer les exercices avec Chrono à la fin
+            const regex = /\((\d+)\s*(sec|min|minute)s?\)/i;
+            selection.sort((a, b) => {
+                const aHasTimer = regex.test(a);
+                const bHasTimer = regex.test(b);
+                if (aHasTimer && !bHasTimer) return 1;
+                if (!aHasTimer && bHasTimer) return -1;
+                return 0;
+            });
+
             currentExercises = selection;
             localStorage.setItem('exercise_date', todayStr);
             localStorage.setItem('daily_exercises', JSON.stringify(currentExercises));
@@ -328,7 +343,10 @@
                 let li = document.createElement('li');
                 li.className = 'exercise-item';
                 
-                // Recherche d'une durée dans le texte (ex: "30 sec", "1 min", "2 minutes")
+                let textSpan = document.createElement('span');
+                textSpan.innerText = ex;
+                li.appendChild(textSpan);
+                
                 let match = ex.match(/\((\d+)\s*(sec|min|minute)s?\)/i);
                 
                 if (match) {
@@ -336,35 +354,23 @@
                     let unit = match[2].toLowerCase();
                     let seconds = unit.startsWith('min') ? val * 60 : val;
                     
-                    if (!firstTimeFound) firstTimeFound = seconds; // Mémorise la première durée trouvée
-
-                    // Construction de la ligne avec le bouton Chrono
-                    let textSpan = document.createElement('span');
-                    textSpan.innerText = ex;
-                    textSpan.style.textAlign = 'left';
+                    if (!firstTimeFound) firstTimeFound = seconds;
 
                     let btn = document.createElement('button');
                     btn.className = 'timer-quick-btn';
                     btn.innerHTML = `⏱️ ${formatTime(seconds)}`;
                     btn.onclick = () => setAndStartTimer(seconds);
 
-                    li.appendChild(textSpan);
                     li.appendChild(btn);
-                    li.style.display = 'flex';
-                    li.style.justifyContent = 'space-between';
-                    li.style.alignItems = 'center';
-                } else {
-                    li.innerText = ex;
                 }
                 list.appendChild(li);
             });
 
-            // Met à jour le chronomètre global si l'utilisateur ne l'a pas encore lancé
             currentTimerDefault = firstTimeFound || 60;
             if (!isTimerRunning) {
                 timeLeft = currentTimerDefault;
-                document.getElementById('timerDisplay').innerText = formatTime(timeLeft);
-                document.getElementById('timerDisplay').style.color = "#4ade80";
+                timerDisplay.innerText = formatTime(timeLeft);
+                timerDisplay.style.color = "#4ade80";
             }
         }
 
@@ -408,23 +414,27 @@
         }
 
         // --- CHRONOMÈTRE AVANCÉ ---
-        const timerDisplay = document.getElementById('timerDisplay');
+        function updateToggleBtn() {
+            if (isTimerRunning) {
+                toggleTimerBtn.innerText = "⏸";
+                toggleTimerBtn.classList.remove("play");
+                toggleTimerBtn.classList.add("pause");
+            } else {
+                toggleTimerBtn.innerText = "▶";
+                toggleTimerBtn.classList.remove("pause");
+                toggleTimerBtn.classList.add("play");
+            }
+        }
 
-        // Fonction appelée par le bouton rapide "⏱️"
         function setAndStartTimer(seconds) {
             clearInterval(timerInterval);
-            isTimerRunning = false;
             currentTimerDefault = seconds;
             timeLeft = seconds;
             timerDisplay.innerText = formatTime(timeLeft);
-            document.getElementById('playTimerBtn').click(); // Lance automatiquement
-        }
-
-        document.getElementById('playTimerBtn').addEventListener('click', () => {
-            if (isTimerRunning || timeLeft <= 0) return;
-            isTimerRunning = true;
             timerDisplay.style.color = "#ffffff";
-            
+            isTimerRunning = true;
+            updateToggleBtn();
+
             timerInterval = setInterval(() => {
                 timeLeft--;
                 timerDisplay.innerText = formatTime(timeLeft);
@@ -433,25 +443,48 @@
                     isTimerRunning = false;
                     timerDisplay.innerText = "Terminé !";
                     timerDisplay.style.color = "#4ade80";
+                    updateToggleBtn();
                     playSuccessSound();
                 }
             }, 1000);
-        });
+        }
 
-        document.getElementById('pauseTimerBtn').addEventListener('click', () => {
+        toggleTimerBtn.addEventListener('click', () => {
             if (isTimerRunning) {
+                // Mettre en pause
                 clearInterval(timerInterval);
                 isTimerRunning = false;
-                timerDisplay.style.color = "#f39c12"; // Devient orange en pause
+                timerDisplay.style.color = "#f39c12"; // Orange en pause
+                updateToggleBtn();
+            } else {
+                // Reprendre ou Lancer
+                if (timeLeft <= 0) return;
+                isTimerRunning = true;
+                timerDisplay.style.color = "#ffffff";
+                updateToggleBtn();
+                
+                timerInterval = setInterval(() => {
+                    timeLeft--;
+                    timerDisplay.innerText = formatTime(timeLeft);
+                    if (timeLeft <= 0) {
+                        clearInterval(timerInterval);
+                        isTimerRunning = false;
+                        timerDisplay.innerText = "Terminé !";
+                        timerDisplay.style.color = "#4ade80";
+                        updateToggleBtn();
+                        playSuccessSound();
+                    }
+                }, 1000);
             }
         });
 
         document.getElementById('resetTimerBtn').addEventListener('click', () => {
             clearInterval(timerInterval);
             isTimerRunning = false;
-            timeLeft = currentTimerDefault; // Revient au temps par défaut détecté
+            timeLeft = currentTimerDefault;
             timerDisplay.innerText = formatTime(timeLeft);
             timerDisplay.style.color = "#4ade80";
+            updateToggleBtn();
         });
 
         function playSuccessSound() {
@@ -602,7 +635,7 @@
         document.addEventListener('click', () => { document.getElementById('appMenu').classList.remove('active'); });
 
         document.getElementById('resetStreakBtn').addEventListener('click', () => {
-            if (confirm("Remettre la série à zéro ? 😢 Cindy va être très déçue.")) {
+            if (confirm("Remettre la série à zéro ? 😢 Cindy va être très déçue...")) {
                 localStorage.setItem('sport_streak', 0);
                 localStorage.removeItem('last_workout_date');
                 location.reload();
