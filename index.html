@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DuoSport</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#121212">
+    
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #121212; color: #e0e0e0; text-align: center; display: flex; flex-direction: column;
+            align-items: center; justify-content: flex-start; height: 100dvh; min-height: 100vh;
+            margin: 0; overflow: hidden; position: relative; padding-top: 70px;
+        }
+
+        /* --- Header --- */
+        #appHeader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 55px; background: rgba(18, 18, 18, 0.9);
+            border-bottom: 1px solid #333; display: grid; grid-template-columns: 1fr auto 1fr;
+            align-items: center; padding: 0 15px; z-index: 20; backdrop-filter: blur(5px); box-sizing: border-box;
+        }
+        #logoContainer { grid-column: 2; display: flex; justify-content: center; }
+        .app-logo { max-height: 32px; width: auto; border-radius: 50%; }
+
+        /* --- Menus --- */
+        #menuBtn {
+            grid-column: 3; justify-self: end; background: transparent; color: #fff; border: none;
+            font-size: 24px; cursor: pointer; padding: 10px; display: flex; align-items: center; justify-content: center;
+        }
+        #appMenu {
+            position: absolute; top: 60px; right: 15px; background: #1e1e1e; border: 1px solid #333;
+            border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); z-index: 30; width: 180px;
+            display: flex; flex-direction: column; padding: 5px 0; transform-origin: top right;
+            transition: transform 0.2s, opacity 0.2s; transform: scale(0.9); opacity: 0; pointer-events: none;
+        }
+        #appMenu.active { transform: scale(1); opacity: 1; pointer-events: auto; }
+        .menu-item {
+            background: transparent; color: #fff; border: none; text-align: left; padding: 12px 15px;
+            font-size: 14px; width: 100%; cursor: pointer; border-bottom: 1px solid #2a2a2a;
+        }
+        .menu-item:last-child { border-bottom: none; }
+        .menu-item:hover { background-color: rgba(255,255,255,0.05); }
+
+        /* --- Conteneur Principal --- */
+        .container {
+            background: #1e1e1e; padding: 25px 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            max-width: 90%; width: 340px; z-index: 10; display: flex; flex-direction: column; align-items: center;
+            max-height: calc(100vh - 90px); overflow-y: auto;
+        }
+        
+        #cindyMood {
+            background: #2a2a2a; color: #fff; padding: 8px 15px; border-radius: 30px;
+            font-size: 14px; font-weight: 500; margin-bottom: 15px; border: 1px solid #333;
+        }
+
+        /* --- Contrôles (Difficulté & Reroll) --- */
+        .controls-row { display: flex; justify-content: space-between; width: 100%; margin-bottom: 15px; gap: 10px; }
+        .btn-small {
+            background: #2a2a2a; color: #fff; border: 1px solid #444; padding: 8px 12px;
+            border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer;
+            flex: 1; display: flex; justify-content: center; align-items: center;
+        }
+        .btn-small:hover:not(:disabled) { background: #333; }
+        .btn-small:disabled { opacity: 0.5; cursor: not-allowed; }
+        select.btn-small { appearance: none; text-align: center; }
+        .text-green { color: #4ade80; }
+
+        h1 { color: #ffffff; font-size: 18px; margin: 0 0 10px 0; text-transform: uppercase; }
+        
+        /* --- Liste des Exercices --- */
+        #exerciseList { list-style: none; padding: 0; margin: 0 0 15px 0; width: 100%; }
+        .exercise-item {
+            background: #2a2a2a; border: 1px solid #333; padding: 12px 15px;
+            border-radius: 12px; margin-bottom: 8px; font-size: 16px; font-weight: bold;
+            color: #fff; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+            /* Alignement à gauche forcé */
+            text-align: left; display: flex; justify-content: space-between; align-items: center; line-height: 1.3;
+        }
+        
+        /* Bouton rapide Chrono dans la liste */
+        .timer-quick-btn {
+            background: #4ade80; color: #121212; border: none; padding: 6px 10px;
+            border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 12px;
+            display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: 10px;
+            box-shadow: 0 2px 5px rgba(74, 222, 128, 0.2);
+        }
+        .timer-quick-btn:hover { background: #22c55e; }
+        .timer-quick-btn:active { transform: scale(0.95); }
+
+        /* --- Chronomètre --- */
+        #timerContainer {
+            background: #222; border: 1px solid #4ade80; border-radius: 12px;
+            padding: 10px 15px; margin-bottom: 15px; width: 100%; box-sizing: border-box;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        #timerDisplay { font-size: 24px; font-weight: bold; color: #4ade80; font-family: monospace; }
+        .timer-controls { display: flex; gap: 8px; }
+        .timer-btn {
+            background: #333; color: #fff; border: none; width: 36px; height: 36px;
+            border-radius: 50%; display: flex; justify-content: center; align-items: center;
+            cursor: pointer; font-size: 16px; transition: all 0.2s;
+        }
+        .timer-btn.play { background: #4ade80; color: #121212; }
+        .timer-btn.pause { background: #f39c12; color: #121212; }
+        .timer-btn:hover { filter: brightness(1.2); }
+        .timer-btn:active { transform: scale(0.9); }
+
+        #streakDisplay { margin-bottom: 15px; font-size: 18px; font-weight: bold; color: #ffffff; }
+        #streakCount { color: #4ade80; }
+
+        button#doneBtn {
+            background-color: #4ade80; color: #121212; border: none; padding: 14px 24px;
+            font-size: 16px; font-weight: bold; border-radius: 50px; cursor: pointer; transition: all 0.2s; width: 100%;
+        }
+        button#doneBtn:active { transform: translateY(1px); }
+        button#doneBtn:disabled { background-color: #333; color: #777; cursor: not-allowed; }
+
+        /* --- Modales --- */
+        .modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85);
+            z-index: 50; display: flex; justify-content: center; align-items: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .modal.active { opacity: 1; pointer-events: auto; }
+        .modal-content {
+            background: #1e1e1e; width: 85%; max-height: 80vh; border-radius: 20px;
+            padding: 20px; overflow-y: auto; border: 1px solid #333; position: relative;
+        }
+        .close-modal {
+            position: absolute; top: 15px; right: 15px; background: none; border: none;
+            color: #fff; font-size: 24px; cursor: pointer;
+        }
+        .modal h2 { margin-top: 0; color: #4ade80; font-size: 20px; }
+
+        /* Badges */
+        .badge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 20px; }
+        .badge {
+            background: #2a2a2a; border-radius: 10px; padding: 10px 5px; text-align: center;
+            opacity: 0.4; filter: grayscale(100%); border: 1px solid #333; transition: all 0.3s;
+            display: flex; flex-direction: column; justify-content: center;
+        }
+        .badge.unlocked { opacity: 1; filter: none; border-color: #4ade80; box-shadow: 0 0 10px rgba(74, 222, 128, 0.1); }
+        .badge-icon { font-size: 24px; margin-bottom: 5px; }
+        .badge-title { font-size: 11px; font-weight: bold; color: #fff; line-height: 1.2; margin-bottom: 4px; }
+        .badge-desc { font-size: 9px; color: #aaa; }
+
+        #newBadgeList { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; }
+        .new-badge-item { background: #2a2a2a; padding: 15px; border-radius: 10px; border: 1px solid #4ade80; }
+
+        /* Calendrier */
+        .calendar-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+        .day-name { font-size: 10px; color: #888; text-transform: uppercase; }
+        .cal-day { aspect-ratio: 1; background: #2a2a2a; border-radius: 5px; display: flex; justify-content: center; align-items: center; font-size: 12px; }
+        .cal-day.done { background: #4ade80; color: #121212; font-weight: bold; }
+        .cal-day.empty { background: transparent; }
+    </style>
+</head>
+<body>
+
+    <header id="appHeader">
+        <div style="width: 32px;"></div>
+        <div id="logoContainer"><img src="icon.png" alt="DuoSport Logo" class="app-logo" onerror="this.style.display='none'"></div>
+        <button id="menuBtn">☰</button>
+
+        <div id="appMenu">
+            <button class="menu-item" id="openBadgesBtn">🏆 Mes Badges</button>
+            <button class="menu-item" id="openHistoryBtn">📅 Mon Historique</button>
+            <button class="menu-item" id="resetStreakBtn" style="color:#ff4757;">⚠️ Reset Série</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div id="cindyMood">😐 Cindy charge son humeur...</div>
+
+        <div class="controls-row">
+            <select id="diffSelect" class="btn-small">
+                <option value="facile">Niveau : Facile</option>
+                <option value="intermediaire">Niveau : Moyen</option>
+                <option value="difficile">Niveau : Difficile</option>
+            </select>
+            <button id="rerollBtn" class="btn-small"><span>🎲 Reroll (<span id="rerollCountUi">0</span>)</span></button>
+        </div>
+
+        <h1>Entraînement du Jour</h1>
+        
+        <ul id="exerciseList"></ul>
+
+        <div id="timerContainer">
+            <span id="timerDisplay">01:00</span>
+            <div class="timer-controls">
+                <button class="timer-btn play" id="toggleTimerBtn">▶</button>
+                <button class="timer-btn" id="resetTimerBtn">🔄</button>
+            </div>
+        </div>
+
+        <div id="streakDisplay">🔥 <span id="streakCount">0</span> jour(s)</div>
+        <button id="doneBtn">J'ai fait mon sport !</button>
+    </div>
+
+    <div class="modal" id="badgeUnlockModal">
+        <div class="modal-content" style="text-align: center;">
+            <h2>🎉 Succès Débloqué !</h2>
+            <div id="newBadgeList"></div>
+            <p style="font-size: 14px; font-weight: bold;">Bonus : <span class="text-green">+<span id="earnedRerolls">0</span> Reroll(s)</span></p>
+            <button class="btn-small" style="width: 100%; margin-top: 15px; background: #4ade80; color: #121212;" onclick="document.getElementById('badgeUnlockModal').classList.remove('active')">Génial !</button>
+        </div>
+    </div>
+
+    <div class="modal" id="badgesModal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="document.getElementById('badgesModal').classList.remove('active')">×</button>
+            <h2>Mes Badges</h2>
+            <div class="badge-grid" id="badgeGrid"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="historyModal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="document.getElementById('historyModal').classList.remove('active')">×</button>
+            <h2 id="calendarTitle">Ce Mois-ci</h2>
+            <div class="calendar-grid" id="calendarGrid"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- BASE DE DONNÉES PAR NIVEAU ---
+        const exercicesDB = {
+            facile: [
+                "Planche (30 sec)", "20 Squats", "Chaise (30 sec)", "10 Pompes sur genoux", 
+                "20 Crunchs", "15 Fentes", "Jumping Jacks (30 sec)", "Gainage côté (20 sec)"
+            ],
+            intermediaire: [
+                "Planche (1 minute)", "50 Squats", "Chaise (1 minute)", "3 séries de 15 Pompes", 
+                "4 séries de 20 Abdos", "20 Burpees", "30 Fentes sautées", "Mountain Climbers (45 sec)"
+            ],
+            difficile: [
+                "Planche (2 minutes)", "100 Squats", "Chaise (2 minutes)", "5 séries de 20 Pompes", 
+                "100 Abdos", "50 Burpees", "Tuck Jumps (1 min)", "Pompes Diamant (3x15)"
+            ]
+        };
+
+        const badgesDef = [
+            { id: 'str_1', icon: '🌱', title: '1er Pas', desc: '1 jour de série' },
+            { id: 'str_3', icon: '🔥', title: 'Échauffement', desc: '3 jours de série' },
+            { id: 'str_7', icon: '⭐', title: '1 Semaine', desc: '7 jours de série' },
+            { id: 'str_14', icon: '💪', title: '2 Semaines', desc: '14 jours de série' },
+            { id: 'str_21', icon: '🧠', title: 'Habitude', desc: '21 jours de série' },
+            { id: 'str_30', icon: '🏆', title: 'Guerrier', desc: '30 jours de série' },
+            { id: 'str_40', icon: '🚀', title: 'Inarrêtable', desc: '40 jours de série' },
+            { id: 'str_50', icon: '👑', title: 'Légende', desc: '50 jours de série' },
+            { id: 'tot_10', icon: '🥉', title: 'Apprenti', desc: '10 sports au total' },
+            { id: 'tot_25', icon: '🥈', title: 'Amateur', desc: '25 sports au total' },
+            { id: 'tot_50', icon: '🥇', title: 'Pro', desc: '50 sports au total' },
+            { id: 'tot_100', icon: '💎', title: 'Vétéran', desc: '100 sports au total' },
+            { id: 'early', icon: '🌅', title: 'Lève-tôt', desc: 'Sport avant 8h' },
+            { id: 'late', icon: '🦉', title: 'Oiseau Nuit', desc: 'Sport après 20h' },
+            { id: 'we', icon: '🎉', title: 'Sans Repos', desc: 'Sport le weekend' }
+        ];
+
+        // --- VARIABLES GLOBALES ---
+        const todayStr = new Date().toISOString().split('T')[0];
+        let currentExercises = [];
+        let rerollCount = 0;
+        
+        let timerInterval = null;
+        let timeLeft = 60;
+        let currentTimerDefault = 60;
+        let isTimerRunning = false;
+        
+        const toggleTimerBtn = document.getElementById('toggleTimerBtn');
+        const timerDisplay = document.getElementById('timerDisplay');
+
+        // Fonction pour formater le temps
+        function formatTime(seconds) {
+            let m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            let s = (seconds % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        // --- INITIALISATION ---
+        function initApp() {
+            const savedDiff = localStorage.getItem('user_difficulty') || 'intermediaire';
+            document.getElementById('diffSelect').value = savedDiff;
+            
+            rerollCount = parseInt(localStorage.getItem('reroll_count') || 0);
+            updateRerollUI();
+
+            let savedDate = localStorage.getItem('exercise_date');
+            let savedExArray = JSON.parse(localStorage.getItem('daily_exercises') || '[]');
+
+            if (savedDate !== todayStr || savedExArray.length === 0) {
+                generateExercises(savedDiff);
+            } else {
+                currentExercises = savedExArray;
+                renderExercises();
+            }
+
+            let streak = parseInt(localStorage.getItem('sport_streak') || 0);
+            document.getElementById('streakCount').innerText = streak;
+            updateCindyMood(streak);
+
+            if (localStorage.getItem('last_workout_date') === todayStr) {
+                verrouillerBouton();
+            }
+        }
+
+        // --- GESTION EXERCICES & REROLL ---
+        function generateExercises(difficulty) {
+            let pool = [...exercicesDB[difficulty]];
+            let selection = [];
+            for(let i = 0; i < 3; i++) {
+                if (pool.length === 0) break;
+                let randomIndex = Math.floor(Math.random() * pool.length);
+                selection.push(pool.splice(randomIndex, 1)[0]);
+            }
+
+            // NOUVEAU : Tri pour placer les exercices avec Chrono à la fin
+            const regex = /\((\d+)\s*(sec|min|minute)s?\)/i;
+            selection.sort((a, b) => {
+                const aHasTimer = regex.test(a);
+                const bHasTimer = regex.test(b);
+                if (aHasTimer && !bHasTimer) return 1;
+                if (!aHasTimer && bHasTimer) return -1;
+                return 0;
+            });
+
+            currentExercises = selection;
+            localStorage.setItem('exercise_date', todayStr);
+            localStorage.setItem('daily_exercises', JSON.stringify(currentExercises));
+            renderExercises();
+        }
+
+        function renderExercises() {
+            const list = document.getElementById('exerciseList');
+            list.innerHTML = '';
+            let firstTimeFound = null;
+
+            currentExercises.forEach(ex => {
+                let li = document.createElement('li');
+                li.className = 'exercise-item';
+                
+                let textSpan = document.createElement('span');
+                textSpan.innerText = ex;
+                li.appendChild(textSpan);
+                
+                let match = ex.match(/\((\d+)\s*(sec|min|minute)s?\)/i);
+                
+                if (match) {
+                    let val = parseInt(match[1]);
+                    let unit = match[2].toLowerCase();
+                    let seconds = unit.startsWith('min') ? val * 60 : val;
+                    
+                    if (!firstTimeFound) firstTimeFound = seconds;
+
+                    let btn = document.createElement('button');
+                    btn.className = 'timer-quick-btn';
+                    btn.innerHTML = `⏱️ ${formatTime(seconds)}`;
+                    btn.onclick = () => setAndStartTimer(seconds);
+
+                    li.appendChild(btn);
+                }
+                list.appendChild(li);
+            });
+
+            currentTimerDefault = firstTimeFound || 60;
+            if (!isTimerRunning) {
+                timeLeft = currentTimerDefault;
+                timerDisplay.innerText = formatTime(timeLeft);
+                timerDisplay.style.color = "#4ade80";
+            }
+        }
+
+        document.getElementById('diffSelect').addEventListener('change', (e) => {
+            const newDiff = e.target.value;
+            localStorage.setItem('user_difficulty', newDiff);
+            if (localStorage.getItem('last_workout_date') !== todayStr) {
+                generateExercises(newDiff);
+            }
+        });
+
+        document.getElementById('rerollBtn').addEventListener('click', () => {
+            if (localStorage.getItem('last_workout_date') === todayStr) {
+                alert("Tu as déjà fait ton sport aujourd'hui !"); return;
+            }
+            if (rerollCount > 0) {
+                rerollCount--;
+                localStorage.setItem('reroll_count', rerollCount);
+                updateRerollUI();
+                generateExercises(document.getElementById('diffSelect').value);
+            } else {
+                alert("Tu n'as plus de Rerolls ! Débloque des badges pour en gagner.");
+            }
+        });
+
+        function updateRerollUI() {
+            document.getElementById('rerollCountUi').innerText = rerollCount;
+            document.getElementById('rerollBtn').disabled = (rerollCount === 0);
+        }
+
+        function updateCindyMood(streak) {
+            let mood = "";
+            if (streak === 0) mood = "😠 Cindy est très déçue...";
+            else if (streak < 3) mood = "😐 Cindy observe tes efforts.";
+            else if (streak < 7) mood = "🙂 Cindy commence à y croire !";
+            else if (streak < 14) mood = "😊 Cindy est fière de toi !";
+            else if (streak < 30) mood = "😍 Cindy est impressionnée !";
+            else if (streak < 50) mood = "🔥 Cindy parle de toi à tout le monde !";
+            else mood = "👑 Cindy est ta plus grande fan absolue !";
+            document.getElementById('cindyMood').innerText = mood;
+        }
+
+        // --- CHRONOMÈTRE AVANCÉ ---
+        function updateToggleBtn() {
+            if (isTimerRunning) {
+                toggleTimerBtn.innerText = "⏸";
+                toggleTimerBtn.classList.remove("play");
+                toggleTimerBtn.classList.add("pause");
+            } else {
+                toggleTimerBtn.innerText = "▶";
+                toggleTimerBtn.classList.remove("pause");
+                toggleTimerBtn.classList.add("play");
+            }
+        }
+
+        function setAndStartTimer(seconds) {
+            clearInterval(timerInterval);
+            currentTimerDefault = seconds;
+            timeLeft = seconds;
+            timerDisplay.innerText = formatTime(timeLeft);
+            timerDisplay.style.color = "#ffffff";
+            isTimerRunning = true;
+            updateToggleBtn();
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerDisplay.innerText = formatTime(timeLeft);
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    isTimerRunning = false;
+                    timerDisplay.innerText = "Terminé !";
+                    timerDisplay.style.color = "#4ade80";
+                    updateToggleBtn();
+                    playSuccessSound();
+                }
+            }, 1000);
+        }
+
+        toggleTimerBtn.addEventListener('click', () => {
+            if (isTimerRunning) {
+                // Mettre en pause
+                clearInterval(timerInterval);
+                isTimerRunning = false;
+                timerDisplay.style.color = "#f39c12"; // Orange en pause
+                updateToggleBtn();
+            } else {
+                // Reprendre ou Lancer
+                if (timeLeft <= 0) return;
+                isTimerRunning = true;
+                timerDisplay.style.color = "#ffffff";
+                updateToggleBtn();
+                
+                timerInterval = setInterval(() => {
+                    timeLeft--;
+                    timerDisplay.innerText = formatTime(timeLeft);
+                    if (timeLeft <= 0) {
+                        clearInterval(timerInterval);
+                        isTimerRunning = false;
+                        timerDisplay.innerText = "Terminé !";
+                        timerDisplay.style.color = "#4ade80";
+                        updateToggleBtn();
+                        playSuccessSound();
+                    }
+                }, 1000);
+            }
+        });
+
+        document.getElementById('resetTimerBtn').addEventListener('click', () => {
+            clearInterval(timerInterval);
+            isTimerRunning = false;
+            timeLeft = currentTimerDefault;
+            timerDisplay.innerText = formatTime(timeLeft);
+            timerDisplay.style.color = "#4ade80";
+            updateToggleBtn();
+        });
+
+        function playSuccessSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator(); const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.start(); osc.stop(ctx.currentTime + 0.2);
+            } catch(e) {}
+        }
+
+        // --- VALIDATION & BADGES ---
+        function verrouillerBouton() {
+            const btn = document.getElementById('doneBtn');
+            btn.innerText = "Fait ✅"; btn.disabled = true;
+            document.getElementById('rerollBtn').disabled = true;
+            document.getElementById('diffSelect').disabled = true;
+        }
+
+        document.getElementById('doneBtn').addEventListener('click', () => {
+            playSuccessSound();
+            confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#4ade80', '#ffffff', '#22c55e'] });
+
+            let history = JSON.parse(localStorage.getItem('workout_history') || '[]');
+            if (!history.includes(todayStr)) {
+                history.push(todayStr);
+                localStorage.setItem('workout_history', JSON.stringify(history));
+            }
+
+            localStorage.setItem('last_workout_date', todayStr);
+            let streak = parseInt(localStorage.getItem('sport_streak') || 0) + 1;
+            localStorage.setItem('sport_streak', streak);
+            document.getElementById('streakCount').innerText = streak;
+            
+            let total = parseInt(localStorage.getItem('total_workouts') || 0) + 1;
+            localStorage.setItem('total_workouts', total);
+
+            verrouillerBouton();
+            updateCindyMood(streak);
+            
+            let newlyUnlocked = checkBadges(streak, total);
+            if (newlyUnlocked.length > 0) {
+                showBadgePopup(newlyUnlocked);
+                rerollCount += newlyUnlocked.length;
+                localStorage.setItem('reroll_count', rerollCount);
+                updateRerollUI();
+            }
+        });
+
+        function checkBadges(streak, total) {
+            let unlocked = JSON.parse(localStorage.getItem('unlocked_badges') || '[]');
+            const hour = new Date().getHours();
+            const day = new Date().getDay();
+            
+            let newlyUnlocked = [];
+
+            const evaluate = (id, condition) => {
+                if (condition && !unlocked.includes(id)) {
+                    unlocked.push(id);
+                    newlyUnlocked.push(badgesDef.find(b => b.id === id));
+                }
+            };
+
+            evaluate('str_1', streak >= 1); evaluate('str_3', streak >= 3);
+            evaluate('str_7', streak >= 7); evaluate('str_14', streak >= 14);
+            evaluate('str_21', streak >= 21); evaluate('str_30', streak >= 30);
+            evaluate('str_40', streak >= 40); evaluate('str_50', streak >= 50);
+            
+            evaluate('tot_10', total >= 10); evaluate('tot_25', total >= 25);
+            evaluate('tot_50', total >= 50); evaluate('tot_100', total >= 100);
+
+            evaluate('early', hour < 8); evaluate('late', hour >= 20);
+            evaluate('we', day === 0 || day === 6);
+
+            localStorage.setItem('unlocked_badges', JSON.stringify(unlocked));
+            return newlyUnlocked;
+        }
+
+        function showBadgePopup(newBadges) {
+            const listDiv = document.getElementById('newBadgeList');
+            listDiv.innerHTML = '';
+            
+            newBadges.forEach(b => {
+                listDiv.innerHTML += `
+                    <div class="new-badge-item">
+                        <div style="font-size: 30px;">${b.icon}</div>
+                        <div style="font-weight: bold; color: #fff;">${b.title}</div>
+                        <div style="font-size: 11px; color: #aaa;">${b.desc}</div>
+                    </div>`;
+            });
+            
+            document.getElementById('earnedRerolls').innerText = newBadges.length;
+            document.getElementById('badgeUnlockModal').classList.add('active');
+        }
+
+        function renderBadges() {
+            const grid = document.getElementById('badgeGrid');
+            grid.innerHTML = '';
+            let unlocked = JSON.parse(localStorage.getItem('unlocked_badges') || '[]');
+            
+            badgesDef.forEach(b => {
+                const isUnlocked = unlocked.includes(b.id);
+                grid.innerHTML += `
+                    <div class="badge ${isUnlocked ? 'unlocked' : ''}">
+                        <div class="badge-icon">${b.icon}</div>
+                        <div class="badge-title">${b.title}</div>
+                        <div class="badge-desc">${b.desc}</div>
+                    </div>`;
+            });
+        }
+
+        // --- CALENDRIER ---
+        function renderCalendar() {
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+            const history = JSON.parse(localStorage.getItem('workout_history') || '[]');
+            const now = new Date();
+            const year = now.getFullYear(); const month = now.getMonth();
+            
+            document.getElementById('calendarTitle').innerText = `${["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"][month]} ${year}`;
+
+            ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].forEach(d => {
+                grid.innerHTML += `<div class="day-name">${d}</div>`;
+            });
+
+            let firstDay = new Date(year, month, 1).getDay();
+            firstDay = firstDay === 0 ? 6 : firstDay - 1;
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            for (let i = 0; i < firstDay; i++) grid.innerHTML += `<div class="cal-day empty"></div>`;
+
+            for (let i = 1; i <= daysInMonth; i++) {
+                let dateStr = `${year}-${(month + 1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`;
+                let isDone = history.includes(dateStr) ? 'done' : '';
+                grid.innerHTML += `<div class="cal-day ${isDone}">${i}</div>`;
+            }
+        }
+
+        // --- GESTION MENU ---
+        document.getElementById('menuBtn').addEventListener('click', (e) => {
+            e.stopPropagation(); document.getElementById('appMenu').classList.toggle('active');
+        });
+        document.addEventListener('click', () => { document.getElementById('appMenu').classList.remove('active'); });
+
+        document.getElementById('resetStreakBtn').addEventListener('click', () => {
+            if (confirm("Remettre la série à zéro ? 😢 Cindy va être très déçue..")) {
+                localStorage.setItem('sport_streak', 0);
+                localStorage.removeItem('last_workout_date');
+                location.reload();
+            }
+        });
+
+        document.getElementById('openBadgesBtn').addEventListener('click', () => {
+            renderBadges(); document.getElementById('badgesModal').classList.add('active');
+        });
+
+        document.getElementById('openHistoryBtn').addEventListener('click', () => {
+            renderCalendar(); document.getElementById('historyModal').classList.add('active');
+        });
+
+        initApp();
+    </script>
+</body>
+</html>
